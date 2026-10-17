@@ -11,6 +11,7 @@
 import idbKeyval from 'idb-keyval';
 
 import {FirebaseAuth} from './firebase-auth.js';
+import {getWebsiteString} from './website-locale.js';
 import {getLhrFilenamePrefix, getFlowResultFilenamePrefix} from '../../../report/generator/file-namer.js';
 import {Util} from '../../../shared/util.js';
 
@@ -38,10 +39,10 @@ export class GithubApi {
    */
   async createGist(jsonFile) {
     if (this._saving) {
-      throw new Error('Save already in progress');
+      throw new Error(getWebsiteString('saveInProgress'));
     }
 
-    logger.log('Saving report to GitHub...', false);
+    logger.log(getWebsiteString('savingToGithub'), false);
     this._saving = true;
 
     try {
@@ -56,7 +57,7 @@ export class GithubApi {
         });
       }
       const body = {
-        description: 'Lighthouse json report',
+        description: getWebsiteString('gistDescription'),
         public: false,
         files: {
           [`${filename}${GithubApi.LH_JSON_EXT}`]: {
@@ -76,10 +77,10 @@ export class GithubApi {
       }
       const json = await response.json();
       if (json.id) {
-        logger.log('Saved!');
+        logger.log(getWebsiteString('savedToGithub'));
         return json.id;
       } else {
-        throw new Error('Error: ' + JSON.stringify(json));
+        throw new Error(getWebsiteString('saveFailed', {error: JSON.stringify(json)}));
       }
     } finally {
       this._saving = false;
@@ -92,7 +93,7 @@ export class GithubApi {
    * @return {Promise<LH.Result>}
    */
   getGistFileContentAsJson(id) {
-    logger.log('Fetching report from GitHub...', false);
+    logger.log(getWebsiteString('fetchingFromGithub'), false);
 
     return this._auth.getAccessTokenIfLoggedIn().then(accessToken => {
       const headers = new Headers();
@@ -113,9 +114,8 @@ export class GithubApi {
           const remaining = Number(resp.headers.get('X-RateLimit-Remaining'));
           const limit = Number(resp.headers.get('X-RateLimit-Limit'));
           if (remaining < 10) {
-            logger.warn('Approaching GitHub\'s rate limit. ' +
-                        `${limit - remaining}/${limit} requests used. Consider signing ` +
-                        'in to increase this limit.');
+            logger.warn(getWebsiteString('approachingRateLimit',
+              {used: limit - remaining, limit}));
           }
 
           if (!resp.ok) {
@@ -128,7 +128,7 @@ export class GithubApi {
             } else if (resp.status === 401 && accessToken) {
               this._auth.signOut();
             }
-            throw new Error(`${resp.status} fetching gist`);
+            throw new Error(getWebsiteString('gistFetchFailed', {status: resp.status}));
           }
 
           const etag = resp.headers.get('ETag');
@@ -141,9 +141,8 @@ export class GithubApi {
               filename = gistFiles.find(filename => filename.endsWith('.json'));
             }
             if (!filename) {
-              throw new Error(
-                `Failed to find a Lighthouse report (*${GithubApi.LH_JSON_EXT}) in gist ${id}`
-              );
+              throw new Error(getWebsiteString('gistMissingReport',
+                {extension: GithubApi.LH_JSON_EXT, gistId: id}));
             }
             const f = json.files[filename];
             if (f.truncated) {

@@ -207,10 +207,10 @@ describe('i18n formatter', () => {
   it('should not crash on unknown locales', () => {
     const i18n = new I18nFormatter('unknown-mystery-locale');
     const timestamp = i18n.formatDateTime('2017-04-28T23:07:51.189Z');
-    assert.ok(
-      timestamp.includes('Apr 27, 2017') ||
-      timestamp.includes('Apr 28, 2017') ||
-      timestamp.includes('Apr 29, 2017')
-    );
+    // Compare with the runtime's default locale, including its calendar and digits.
+    const defaultLocale = /** @type {LH.Locale} */ (
+      new Intl.DateTimeFormat().resolvedOptions().locale);
+    const defaultI18n = new I18nFormatter(defaultLocale);
+    assert.equal(timestamp, defaultI18n.formatDateTime('2017-04-28T23:07:51.189Z'));
   });
 });

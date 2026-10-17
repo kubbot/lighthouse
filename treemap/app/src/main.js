@@ -11,6 +11,7 @@
 import {TreemapUtil} from './util.js';
 import {DragAndDrop} from '../../../viewer/app/src/drag-and-drop.js';
 import {GithubApi} from '../../../viewer/app/src/github-api.js';
+import {initWebsiteI18n} from '../../../viewer/app/src/website-locale.js';
 import {I18nFormatter} from '../../../report/renderer/i18n-formatter.js';
 import {TextEncoding} from '../../../report/renderer/text-encoding.js';
 import {Logger} from '../../../report/renderer/logger.js';
@@ -29,6 +30,10 @@ if (!logEl) {
 const logger = new Logger(logEl);
 // `getGistFileContentAsJson` expects logger to be defined globally.
 window.logger = logger;
+
+// Localize the website shell (placeholder page & language menu). English is
+// the default; `strings` is generated in build/build-treemap.js.
+initWebsiteI18n(strings);
 
 /** @type {TreemapViewer} */
 let treemapViewer;
@@ -389,7 +394,8 @@ class TreemapViewer {
         id: 'duplicate-modules',
         label: TreemapUtil.strings.duplicateModulesLabel,
         subLabel: enabled ?
-          TreemapUtil.i18n.formatBytesWithBestUnit(potentialByteSavings) : 'N/A',
+          TreemapUtil.i18n.formatBytesWithBestUnit(potentialByteSavings) :
+          TreemapUtil.strings.notAvailableLabel,
         highlights,
         enabled,
       };
@@ -579,7 +585,8 @@ class TreemapViewer {
       if (!row.unusedBytes) return '';
 
       const percent = row.unusedBytes / row.size;
-      return `${TreemapUtil.i18n.formatPercent(percent)} bytes unused`;
+      return TreemapUtil.strings.unusedBytesTooltip
+        .replace('{percent}', TreemapUtil.i18n.formatPercent(percent));
     };
 
     let cachedMaxSize = 0;
@@ -920,7 +927,7 @@ class LighthouseTreemap {
     placeholderTarget.addEventListener('click', e => {
       const target = /** @type {?Element} */ (e.target);
 
-      if (target && target.localName !== 'input' && target.localName !== 'a') {
+      if (target && !target.closest('input, a, .website-locale-switcher')) {
         fileInput.click();
       }
     });
@@ -931,21 +938,22 @@ class LighthouseTreemap {
    */
   init(options) {
     dom.find('.treemap-placeholder').classList.add('hidden');
-    dom.find('main').classList.remove('hidden');
+    const mainEl = dom.find('main');
+    mainEl.classList.remove('hidden');
 
     const locale = options.lhr.configSettings.locale;
-    document.documentElement.lang = locale;
+    mainEl.lang = locale;
 
     // `strings` is generated in build/build-treemap.js
     TreemapUtil.applyStrings(strings[options.lhr.configSettings.locale]);
     TreemapUtil.i18n = new I18nFormatter(locale);
 
-    // Fill in all i18n data.
-    for (const node of document.querySelectorAll('[data-i18n]')) {
-      // These strings are guaranteed to (at least) have a default English string in TreemapUtil.UIStrings,
-      // so this cannot be undefined as long as `report-ui-features.data-i18n` test passes.
+    // Only the report's own strings follow the LHR locale. Website strings keep
+    // the visitor's chosen language, including the title inside the header.
+    for (const node of mainEl.querySelectorAll('[data-i18n]')) {
       const i18nAttr = /** @type {keyof typeof TreemapUtil['UIStrings']} */ (
         node.getAttribute('data-i18n'));
+      if (!Object.prototype.hasOwnProperty.call(TreemapUtil.UIStrings, i18nAttr)) continue;
       node.textContent = TreemapUtil.strings[i18nAttr];
     }
 
